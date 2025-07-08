@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Supermercado São Jorge - Compras Online</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #fff;
+    color: #333;
+    margin: 0;
+    padding: 0;
+  }
+  header {
+    background: #2f855a;
+    color: white;
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  header h1 {
+    margin: 0;
+  }
+  #searchBar {
+    padding: 0.5rem;
+    font-size: 1rem;
+    width: 250px;
+  }
+  main {
+    padding: 2rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill,minmax(220px,1fr));
+    gap: 1.5rem;
+  }
+  .product-card {
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    padding: 1rem;
+    box-shadow: 0 0 6px #ccc;
+    transition: box-shadow 0.3s ease;
+  }
+  .product-card:hover {
+    box-shadow: 0 0 14px #2f855a;
+  }
+  .product-name {
+    font-weight: bold;
+    margin: 0 0 0.5rem;
+  }
+  .product-price {
+    color: #2f855a;
+    font-weight: bold;
+    margin-bottom: 1rem;
+  }
+  button {
+    background-color: #2f855a;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    font-size: 1rem;
+  }
+  button:hover {
+    background-color: #276644;
+  }
+  #cart {
+    background: #f9fafb;
+    border-top: 2px solid #2f855a;
+    padding: 1rem 2rem;
+    max-width: 800px;
+    margin: 2rem auto;
+    border-radius: 12px;
+  }
+  #cart h2 {
+    margin-top: 0;
+  }
+  #cart-list {
+    list-style: none;
+    padding-left: 0;
+    margin-bottom: 1rem;
+  }
+  #cart-list li {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid #ddd;
+    padding: 0.5rem 0;
+  }
+  #adminPanel {
+    background: #fff3cd;
+    border: 1px solid #ffeeba;
+    padding: 1rem 2rem;
+    max-width: 800px;
+    margin: 2rem auto;
+    border-radius: 12px;
+  }
+  #adminPanel input {
+    padding: 0.5rem;
+    font-size: 1rem;
+    margin-right: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+  }
+  #loginSection {
+    margin-left: 1rem;
+  }
+  #loginButton {
+    background: #4a5568;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Supermercado São Jorge</h1>
+  <div>
+    <input type="text" id="searchBar" placeholder="Buscar produtos..." />
+    <button id="loginButton">Entrar</button>
+  </div>
+</header>
+
+<main id="productsContainer"></main>
+
+<section id="cart">
+  <h2>Resumo do Carrinho</h2>
+  <ul id="cart-list"></ul>
+  <p><strong>Total: R$ <span id="totalPrice">0.00</span></strong></p>
+  <button id="checkoutButton">Finalizar Compra</button>
+</section>
+
+<section id="adminPanel" style="display:none;">
+  <h2>Painel Administrativo</h2>
+  <input type="text" id="newProductName" placeholder="Nome do produto" />
+  <input type="number" id="newProductPrice" placeholder="Preço" min="0" step="0.01" />
+  <button id="addProductButton">Adicionar Produto</button>
+</section>
+
+<script>
+  // Dados iniciais
+  let products = [
+    { id: 1, name: "Arroz 5kg", price: 25.99 },
+    { id: 2, name: "Feijão 1kg", price: 7.49 },
+    { id: 3, name: "Macarrão 500g", price: 4.99 },
+    { id: 4, name: "Óleo de soja 900ml", price: 8.99 }
+  ];
+
+  let cart = [];
+  let user = null; // {name: 'João da Silva', isAdmin: true}
+
+  // Referências DOM
+  const productsContainer = document.getElementById("productsContainer");
+  const cartList = document.getElementById("cart-list");
+  const totalPriceElem = document.getElementById("totalPrice");
+  const checkoutButton = document.getElementById("checkoutButton");
+  const searchBar = document.getElementById("searchBar");
+  const loginButton = document.getElementById("loginButton");
+  const adminPanel = document.getElementById("adminPanel");
+  const newProductName = document.getElementById("newProductName");
+  const newProductPrice = document.getElementById("newProductPrice");
+  const addProductButton = document.getElementById("addProductButton");
+
+  // Função para salvar produtos no localStorage
+  function saveProducts() {
+    localStorage.setItem("produtos_sao_jorge", JSON.stringify(products));
+  }
+
+  // Função para carregar produtos do localStorage
+  function loadProducts() {
+    const stored = localStorage.getItem("produtos_sao_jorge");
+    if (stored) {
+      products = JSON.parse(stored);
+    }
+  }
+
+  // Mostrar produtos na tela (filtrados pelo search)
+  function showProducts() {
+    const searchText = searchBar.value.toLowerCase();
+    productsContainer.innerHTML = "";
+    const filtered = products.filter(p => p.name.toLowerCase().includes(searchText));
+    if (filtered.length === 0) {
+      productsContainer.innerHTML = "<p>Nenhum produto encontrado.</p>";
+      return;
+    }
+    filtered.forEach(product => {
+      const card = document.createElement("div");
+      card.className = "product-card";
+      card.innerHTML = `
+        <p class="product-name">${product.name}</p>
+        <p class="product-price">R$ ${product.price.toFixed(2)}</p>
+        <button data-id="${product.id}">Adicionar ao carrinho</button>
+      `;
+      productsContainer.appendChild(card);
+
+      // Botão adicionar ao carrinho
+      card.querySelector("button").addEventListener("click", () => {
+        addToCart(product.id);
+      });
+    });
+  }
+
+  // Adicionar produto ao carrinho
+  function addToCart(productId) {
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+    cart.push(product);
+    showCart();
+  }
+
+  // Mostrar itens do carrinho
+  function showCart() {
+    cartList.innerHTML = "";
+    if (cart.length === 0) {
+      cartList.innerHTML = "<li>Seu carrinho está vazio.</li>";
+      totalPriceElem.textContent = "0.00";
+      return;
+    }
+    cart.forEach((item, index) => {
+      const li = document.createElement("li");
+      li.innerHTML = `
+        <span>${item.name}</span>
+        <span>R$ ${item.price.toFixed(2)}</span>
+      `;
+      cartList.appendChild(li);
+    });
+    const total = cart.reduce((sum, item) => sum + item.price, 0);
+    totalPriceElem.textContent = total.toFixed(2);
+  }
+
+  // Finalizar compra
+  checkoutButton.addEventListener("click", () => {
+    if (cart.length === 0) {
+      alert("Seu carrinho está vazio.");
+      return;
+    }
+    alert("Pagamento processado com sucesso via Pix!");
+    cart = [];
+    showCart();
+  });
+
+  // Login simulado
+  loginButton.addEventListener("click", () => {
+    if (!user) {
+      user = { name: "João da Silva", isAdmin: true };
+      loginButton.textContent = user.name;
+      adminPanel.style.display = "block";
+    } else {
+      // Logout
+      user = null;
+      loginButton.textContent = "Entrar";
+      adminPanel.style.display = "none";
+    }
+  });
+
+  // Adicionar novo produto (admin)
+  addProductButton.addEventListener("click", () => {
+    const name = newProductName.value.trim();
+    const price = parseFloat(newProductPrice.value);
+    if (!name || isNaN(price) || price <= 0) {
+      alert("Por favor, insira um nome válido e um preço maior que zero.");
+      return;
+    }
+    const newProduct = {
+      id: Date.now(),
+      name,
+      price
+    };
+    products.push(newProduct);
+    saveProducts();
+    showProducts();
+    newProductName.value = "";
+    newProductPrice.value = "";
+  });
+
+  // Atualizar lista conforme busca
+  searchBar.addEventListener("input", () => {
+    showProducts();
+  });
+
+  // Inicialização
+  loadProducts();
+  showProducts();
+  showCart();
+
+</script>
+
+</body>
+</html>
